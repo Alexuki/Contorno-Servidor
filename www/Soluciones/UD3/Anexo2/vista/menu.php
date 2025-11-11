@@ -1,7 +1,7 @@
 <?php $url_completa= 'http://'.$_SERVER['HTTP_HOST']."/Soluciones/UD3/Anexo2/"; ?>
 <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
     <div class="position-sticky">
-        <ul class="nav flex-clumn">
+        <ul class="nav flex-column">
             <li class="nav-item">
                 <a class="nav-link" href="<?php echo $url_completa.'index.php'?>">
                     Home
