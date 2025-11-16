@@ -20,17 +20,12 @@
     echo "Conexión correcta. <br>";
 
     //3. Consulta
-    $sql = "SELECT id, nombre, apellido FROM clientes";
-    $resultados = $conexion->query($sql);
+    $sql = "DELETE FROM clientes WHERE id=3";
 
-    if($resultados->num_rows > 0) {
-        // Colocar resultados en matriz asociativa con fetch_assoc()
-        // que devuelve una fila del conjunto de resultados cada vez que se invoca
-        while($row = $resultados->fetch_assoc()) {
-            echo $row["id"] . " - " . $row["nombre"] . " " . $row["apellido"] . "<br>";
-        }
+    if($conexion->query($sql)) {
+        echo "Eliminación correcta. <br>";
     } else {
-        echo "No hay resultados <br>";
+        echo "Error al eliminar: " . $conexion->error .  "<br>";
     }
     
 

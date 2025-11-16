@@ -17,16 +17,12 @@
     echo "Conexión procedimental correcta. <br>";
 
     //3. Consulta
-    $sql = "SELECT id, nombre, apellido FROM clientes";
-    $result = mysqli_query($con, $sql);
+    $sql = "DELETE FROM clientes WHERE id=3";
 
-    if(mysqli_num_rows($result) > 0) {
-        while($row = mysqli_fetch_assoc($result)) {
-            echo $row["id"] . " - " . $row["nombre"] . " " . $row["apellido"] . "<br>";
-        }
-
+    if(mysqli_query($con, $sql)) {
+        echo "Eliminación correcta. <br>";
     } else {
-        echo "No hay resultados <br>";
+         echo "Error al eliminar: " . mysqli_error($con) .  "<br>";
     }
 
 
