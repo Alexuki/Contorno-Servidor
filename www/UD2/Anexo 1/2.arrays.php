@@ -3,7 +3,7 @@
     <head>
         <title>Anexo 1</title>
         <meta charset="UTF-8" />
-        <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css">
     </head>
 
     <body>
@@ -170,6 +170,7 @@
             
                 $places = explode(";", $informacion);
             ?>
+
             <table class="table table-bordered mw-50 w-50">
                 <tr>
                     <td>Ciudad</td>
@@ -183,6 +184,7 @@
                     }
                 ?>
             </table>
+
             <br>
         
             <p>Con la información anterior, realiza las seguintes tareas:</p>
