@@ -4,7 +4,7 @@
 
     /*
     Se recuperarán los datos de la BBDD para el id seleccionado y
-    se mostrarán en un formaulario como el de dar de alta un nuevo usuario
+    se mostrarán en un formulario como el de dar de alta un nuevo usuario
     para que el usuario pueda editarlos.
     */
 
@@ -33,7 +33,7 @@
         editar_usuario($conexion, $id_user, $nombre, $apellidos, $edad, $provincia);
         header("Location: listar.php");
     } else {
-        // Si se acaba ded cargar la página, cargar los datos de usuario mediante el id recibido
+        // Si se acaba de cargar la página, cargar los datos de usuario mediante el id recibido
         if (isset($_GET["id"])) {
             $id_user = $_GET["id"];
             
