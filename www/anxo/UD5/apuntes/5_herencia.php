@@ -14,6 +14,9 @@ class Fruit {
     }
 }
 
+// Con herencia, los atributos privados de la clase padre no son accesibles
+// desde la clase hija.
+
 // Clase hija (hereda de Fruit)
 class Strawberry extends Fruit {
     // Método propio de la clase hija
@@ -22,6 +25,12 @@ class Strawberry extends Fruit {
     }
 }
 
+/**
+ * Comentario @disregard P1005
+ * Disables PHP CodeSniffer warning P1005 for the following code.
+ * P1005 is typically a "Class declaration should be preceded by a blank line" warning.
+ * This directive tells the code analyzer to ignore this specific rule for the code below.
+ */
 // Crear objeto de clase hija
 /** @disregard P1005 */
 $strawberry = new Strawberry("Fresa", "Roja");

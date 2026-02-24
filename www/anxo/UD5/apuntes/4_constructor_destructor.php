@@ -22,6 +22,7 @@ class Fruit {
 
 // Crear objeto (el constructor se llama automáticamente)
 $apple = new Fruit("Manzana", "Roja");
+//$banana = new Fruit("Plátano", "Amarillo");
 $apple->get_details();
 
 // Al final del script, el destructor se llama automáticamente

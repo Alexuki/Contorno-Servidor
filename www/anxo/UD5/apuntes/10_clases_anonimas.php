@@ -6,6 +6,11 @@ $greeting = new class {
     }
 };
 
+/*
+Pueden ser útiles para crear una función dentro de la estructura de POO,
+creando un objeto con un método, sin crear una función suelta.
+*/
+
 echo $greeting->sayHello() . "<br>";
 
 // Con constructor

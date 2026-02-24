@@ -18,7 +18,9 @@ class Strawberry extends Fruit {
     public function message() {
         echo "¿Soy fruta o baya? ";
         // OK: intro() es protected, accesible desde clase hija
-        $this->intro();
+        $this->intro(); 
+        // El método intro() se puede llamar desde auí porque estoy dentro de
+        // la clase hija y es un método protected de la clase padre.
     }
 }
 
@@ -26,6 +28,7 @@ class Strawberry extends Fruit {
 $strawberry = new Strawberry("Fresa", "Roja");
 $strawberry->message();  // OK: método público
 
+// Al llamar al método protected desde fuera de la clase, da error.
 // Esto daría error (descomentar para probar):
 // $strawberry->intro();  // ERROR: intro() es protected
 ?>

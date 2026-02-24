@@ -55,6 +55,7 @@ $bird->makeSound();
 $bird->move();
 
 // Verificar que todos son Animales
+// instanceof funciona para clases y para interfaces
 echo "<h2>Verificación con instanceof</h2>";
 $animals = [$cat, $dog, $bird];
 foreach ($animals as $animal) {

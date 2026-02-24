@@ -1,5 +1,18 @@
 <?php
 // TRAIT: reutilizar código en múltiples clases
+/*
+Similares a interfaces pero la interfaz es una plantilla a seguir
+obligatoriamente. Obliga a implementar todos los métodos.
+Un trait es como una librería con distintos métodos para cargar.
+Es para reutilizar métodos en diferentes clases que no heredan o
+no usan interfaces. Se crea un trait con métodos ya implementados
+y se cargan en las clases mediante use. Eso es como copiar y pegar
+el código dentro de la clase.
+Además, solo se cargan una vez, no se cargan cada vez que ponemos use.
+El trait se suele poner al inicio de la clase pero puede ponerse después.
+Los traits pueden usarse dentro de una clase pero también desde fuera
+mediante una instancia de una clase que usa el trait.
+*/
 
 trait Mensaje {
     public function mostrarMensaje($texto) {
