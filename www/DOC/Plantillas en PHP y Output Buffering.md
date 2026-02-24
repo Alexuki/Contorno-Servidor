@@ -117,6 +117,17 @@ include "header.php";
 
 ## Métodos para crear plantillas
 
+### Comparación rápida de métodos
+
+| Método | Complejidad | ¿Devuelve HTML? | Mejor para |
+|--------|-------------|-----------------|------------|
+| **1. Header/Footer includes** | ⭐ Simple | ❌ No, imprime directo | Proyectos pequeños |
+| **2. Función con strings** | ⭐⭐ Media | ✅ Sí (concatenación) | Evitar (poco legible) |
+| **3. Función con `ob_start()`** | ⭐⭐⭐ Media | ✅ Sí (captura HTML) | HTML complejo como variable |
+| **4. Función que imprime** | ⭐ Simple | ❌ No, imprime directo | **RECOMENDADO para plantillas** |
+
+---
+
 ### Método 1: Header y Footer (Más simple)
 
 **Estructura:**
@@ -192,7 +203,50 @@ include "plantillas/header.php";
 
 ---
 
-### Método 2: Plantilla con función
+### Método 2: Función con strings (NO RECOMENDADO)
+
+**plantillas/layout.php:**
+```php
+<?php
+function renderizar_pagina($titulo, $contenido) {
+    $html = '<!DOCTYPE html>';
+    $html .= '<html><head>';
+    $html .= '<title>' . $titulo . '</title>';
+    $html .= '</head><body>';
+    $html .= '<h1>' . $titulo . '</h1>';
+    $html .= $contenido;
+    $html .= '</body></html>';
+    
+    echo $html;
+}
+?>
+```
+
+**Uso:**
+```php
+<?php
+include "plantillas/layout.php";
+
+$contenido = "<p>Mi contenido</p>";
+$contenido .= "<p>Más contenido</p>";
+
+renderizar_pagina("Mi Página", $contenido);
+?>
+```
+
+**❌ Problemas:**
+- Concatenar strings es tedioso y propenso a errores
+- Sintaxis HTML no tiene resaltado de código
+- Difícil de mantener
+- Propenso a errores de comillas y escape
+
+**⚠️ NO USES ESTE MÉTODO** - Existe para completitud, pero hay mejores opciones.
+
+---
+
+### Método 3: Función con Output Buffering - Para capturar HTML en variables
+
+**Cuándo usar:** Cuando necesitas que la función **devuelva** el HTML como string (para guardarlo en variable, procesarlo, etc.).
 
 **plantillas/layout.php:**
 ```php
@@ -324,10 +378,369 @@ renderizar_pagina("Mi Página", $contenido);
 - Puedes usar toda la sintaxis de PHP/HTML
 - Más flexible y escalable
 - Separación clara entre lógica y presentación
+- La función **devuelve** el HTML (puedes guardarlo en variable)
+
+**⚠️ Cuándo usar:**
+- Necesitas guardar el HTML en una variable
+- Necesitas procesar o modificar el HTML antes de mostrarlo
+- Trabajas con sistemas de cache
 
 ---
 
-### Método 4: Plantilla con datos estructurados
+### Método 4: Función que imprime directamente (⭐ RECOMENDADO PARA PLANTILLAS)
+
+Este es el método **más común y recomendado** para sistemas de plantillas en PHP.
+
+**¿Por qué es el mejor para plantillas?**
+- ✅ HTML limpio sin concatenación
+- ✅ No requiere `ob_start()` (menos overhead)
+- ✅ Sintaxis más natural para plantillas
+- ✅ Es como funcionan WordPress, Laravel views, etc.
+
+---
+
+#### Estructura básica
+
+**vista/pageTop.php:**
+```php
+<?php
+function pageTop($titulo) {
+    // No usa return, imprime directamente
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $titulo ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <?php include __DIR__ . "/header.php" ?>
+    
+    <div class="container-fluid">
+        <div class="row">
+            <?php include __DIR__ . "/menu.php" ?>
+            
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="container pt-3 pb-2 mb-3 border-bottom">
+                    <h2><?= $titulo ?></h2>
+                </div>
+                <div class="container">
+                    <!-- Aquí empieza el contenido de cada página -->
+<?php
+}
+?>
+```
+
+**vista/pageBottom.php:**
+```php
+<?php
+function pageBottom() {
+?>
+                </div> <!-- Cierra container -->
+            </main>
+        </div> <!-- Cierra row -->
+    </div> <!-- Cierra container-fluid -->
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+<?php
+}
+?>
+```
+
+---
+
+#### Uso en páginas
+
+**tareas/lista_tareas.php:**
+```php
+<?php
+// 1. Requires e includes al inicio
+require_once "../modelo/pdo.php";
+include_once "../vista/pageTop.php";
+include_once "../vista/pageBottom.php";
+
+// 2. Lógica de negocio
+$conexion = conectarPDO();
+$tareas = obtenerTareas($conexion);
+
+// 3. Renderizar inicio de página
+pageTop("Lista de Tareas");
+?>
+
+<!-- 4. HTML específico de esta página -->
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Título</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php foreach ($tareas as $tarea): ?>
+        <tr>
+            <td><?= $tarea['id'] ?></td>
+            <td><?= $tarea['titulo'] ?></td>
+            <td><?= $tarea['estado'] ?></td>
+            <td>
+                <a href="editar.php?id=<?= $tarea['id'] ?>" class="btn btn-sm btn-primary">Editar</a>
+                <a href="borrar.php?id=<?= $tarea['id'] ?>" class="btn btn-sm btn-danger">Borrar</a>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    </tbody>
+</table>
+
+<?php 
+// 5. Renderizar final de página
+pageBottom(); 
+?>
+```
+
+---
+
+#### ⚠️ IMPORTANTE: Uso de `__DIR__` en includes
+
+**Problema sin `__DIR__`:**
+
+```php
+// ❌ MAL - vista/pageTop.php
+function pageTop($titulo) {
+?>
+    <?php include "header.php" ?>  <!-- Ruta relativa al CALLER -->
+<?php
+}
+```
+
+**¿Qué pasa?**
+
+```
+Estructura:
+proyecto/
+├── vista/
+│   ├── pageTop.php
+│   ├── header.php
+│   └── menu.php
+└── tareas/
+    └── lista.php
+```
+
+```php
+// tareas/lista.php
+include_once "../vista/pageTop.php";
+pageTop("Mis Tareas");
+
+// Cuando pageTop() ejecuta: include "header.php"
+// PHP busca en: tareas/header.php ❌ (no existe!)
+// Error: Failed to open stream
+```
+
+---
+
+**Solución con `__DIR__`:**
+
+```php
+// ✅ BIEN - vista/pageTop.php
+function pageTop($titulo) {
+?>
+    <?php include __DIR__ . "/header.php" ?>  <!-- Ruta absoluta desde pageTop.php -->
+<?php
+}
+```
+
+**¿Cómo funciona `__DIR__`?**
+
+```php
+// vista/pageTop.php
+function pageTop($titulo) {
+    // __DIR__ = "/ruta/completa/al/proyecto/vista"
+    
+    include __DIR__ . "/header.php";
+    // Resultado: "/ruta/completa/al/proyecto/vista/header.php" ✅
+}
+```
+
+**Ahora funciona desde cualquier ubicación:**
+
+```php
+// tareas/lista.php (en cualquier carpeta)
+include_once "../vista/pageTop.php";
+pageTop("Mis Tareas");
+
+// ✅ __DIR__ siempre apunta a 'vista/', sin importar desde dónde llames
+```
+
+---
+
+#### Constantes mágicas de PHP
+
+| Constante | Contiene | Ejemplo |
+|-----------|----------|---------|
+| `__DIR__` | Directorio del archivo actual | `/var/www/vista` |
+| `__FILE__` | Ruta completa del archivo | `/var/www/vista/pageTop.php` |
+| `__LINE__` | Número de línea actual | `15` |
+| `__FUNCTION__` | Nombre de la función actual | `pageTop` |
+| `__CLASS__` | Nombre de la clase actual | `MiClase` |
+| `__METHOD__` | Nombre del método actual | `MiClase::miMetodo` |
+
+---
+
+#### Comparación: `include` vs `include_once`
+
+```php
+// include - Más rápido
+include __DIR__ . "/header.php";
+// ✅ Incluye siempre
+// ✅ No verifica si ya fue incluido
+// ✅ Más eficiente
+
+// include_once - Más seguro
+include_once __DIR__ . "/header.php";
+// ✅ Verifica si ya fue incluido
+// ✅ Previene inclusiones múltiples
+// ⚠️ Ligeramente más lento
+```
+
+**Para funciones de plantilla:**
+- Usa `include` porque solo se llama una vez por request
+- O usa `include_once` si prefieres más seguridad (diferencia mínima)
+
+---
+
+#### Ejemplo completo con estructura de archivos
+
+**Estructura:**
+```
+proyecto/
+├── vista/
+│   ├── pageTop.php      # Función pageTop()
+│   ├── pageBottom.php   # Función pageBottom()
+│   ├── header.php       # Barra de navegación
+│   └── menu.php         # Menú lateral
+├── modelo/
+│   ├── pdo.php          # Funciones de BD con PDO
+│   └── mysqli.php       # Funciones de BD con MySQLi
+└── tareas/
+    ├── lista.php
+    ├── nueva.php
+    └── editar.php
+```
+
+**vista/pageTop.php:**
+```php
+<?php
+/**
+ * Renderiza el inicio de la página HTML
+ * @param string $titulo - Título de la página
+ */
+function pageTop($titulo) {
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UD3 - <?= htmlspecialchars($titulo) ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <?php include __DIR__ . "/header.php" ?>
+    
+    <div class="container-fluid">
+        <div class="row">
+            <?php include __DIR__ . "/menu.php" ?>
+            
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="container pt-3 pb-2 mb-3 border-bottom">
+                    <h2><?= htmlspecialchars($titulo) ?></h2>
+                </div>
+                <div class="container">
+<?php
+}
+?>
+```
+
+**vista/pageBottom.php:**
+```php
+<?php
+/**
+ * Renderiza el final de la página HTML
+ */
+function pageBottom() {
+?>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+<?php
+}
+?>
+```
+
+**vista/header.php:**
+```php
+<header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="../index.php">
+        UD3 - Anexo 2
+    </a>
+</header>
+```
+
+**vista/menu.php:**
+```php
+<nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+    <div class="position-sticky">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="../index.php">Home</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="../tareas/lista.php">Lista de Tareas</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="../tareas/nueva.php">Nueva Tarea</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+```
+
+---
+
+#### Ventajas de este método (función que imprime)
+
+| Ventaja | Descripción |
+|---------|-------------|
+| ✅ **HTML limpio** | No necesitas concatenar strings ni usar `ob_start()` |
+| ✅ **Resaltado de sintaxis** | El editor colorea HTML correctamente |
+| ✅ **Eficiente** | No hay overhead de buffering |
+| ✅ **Natural** | Es como se usan las plantillas en frameworks reales |
+| ✅ **Portable con `__DIR__`** | Funciona desde cualquier ubicación |
+| ✅ **Fácil de mantener** | HTML legible y estructurado |
+
+---
+
+#### Cuándo usar cada método
+
+| Método | Cuándo usar |
+|--------|-------------|
+| **Método 1: Header/Footer includes** | Proyectos muy simples sin funciones |
+| **Método 2: Strings** | ❌ NUNCA (difícil de mantener) |
+| **Método 3: `ob_start()` + return** | Necesitas el HTML en una variable para procesarlo |
+| **Método 4: Función que imprime** | ⭐ **PLANTILLAS** (inicio y fin de páginas) |
+
+---
+
+### Método 5: Plantilla con datos estructurados
 
 **plantillas/layout.php:**
 ```php

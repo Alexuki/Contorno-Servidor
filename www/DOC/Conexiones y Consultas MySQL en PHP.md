@@ -100,6 +100,187 @@ echo "Conexión exitosa";
 
 ---
 
+### ⚠️ DIFERENCIA IMPORTANTE: connect_error vs error
+
+MySQLi tiene **dos propiedades diferentes** para manejar errores, según el momento en que ocurren:
+
+#### **connect_error / connect_errno - Solo para errores de CONEXIÓN**
+
+Se usan **únicamente** cuando falla el intento de conectar al servidor MySQL:
+
+```php
+<?php
+$conexion = new mysqli('db', 'root', 'wrong_password');
+
+// ✅ Usar connect_error para errores de conexión
+if ($conexion->connect_errno) {
+    echo "Error al conectar: " . $conexion->connect_error;
+    echo "Código: " . $conexion->connect_errno;
+    exit;
+}
+?>
+```
+
+**Cuándo usar `connect_error`:**
+- ❌ Servidor MySQL no accesible
+- ❌ Usuario o contraseña incorrectos
+- ❌ Base de datos especificada no existe
+- ❌ Permisos insuficientes para conectar
+
+---
+
+#### **error / errno - Para errores de CONSULTAS**
+
+Se usan cuando **ya estás conectado** pero una consulta SQL falla:
+
+```php
+<?php
+$conexion = new mysqli('db', 'root', 'test');
+
+// Conexión exitosa, ahora ejecutar consulta
+$resultado = $conexion->query("SELECT * FROM tabla_inexistente");
+
+// ✅ Usar error para errores de consultas
+if ($resultado === false) {
+    echo "Error en consulta: " . $conexion->error;
+    echo "Código: " . $conexion->errno;
+}
+?>
+```
+
+**Cuándo usar `error`:**
+- ❌ Sintaxis SQL incorrecta
+- ❌ Tabla o columna no existe
+- ❌ Violación de restricciones (PRIMARY KEY, FOREIGN KEY)
+- ❌ Tipo de dato incorrecto
+- ❌ Permisos insuficientes para la operación
+
+---
+
+#### **Comparación visual**
+
+| Propiedad | Momento | Objeto | Uso típico |
+|-----------|---------|--------|------------|
+| `connect_error` | Al intentar conectar | `mysqli` | Error antes de establecer conexión |
+| `connect_errno` | Al intentar conectar | `mysqli` | Código del error de conexión |
+| `error` | Después de conectar | `mysqli` | Error al ejecutar consultas |
+| `errno` | Después de conectar | `mysqli` | Código del error de consulta |
+
+---
+
+#### **Ejemplo completo: Manejo correcto de ambos tipos de errores**
+
+```php
+<?php
+// 1. Intentar conectar
+$conexion = new mysqli('db', 'root', 'test');
+
+// 2. Verificar error de CONEXIÓN
+if ($conexion->connect_errno) {
+    die("❌ Error de conexión: " . $conexion->connect_error . 
+        " (Código: " . $conexion->connect_errno . ")");
+}
+
+echo "✅ Conexión exitosa<br>";
+
+// 3. Intentar ejecutar consulta
+$resultado = $conexion->query("SELECT * FROM tabla_inexistente");
+
+// 4. Verificar error de CONSULTA
+if ($resultado === false) {
+    die("❌ Error en consulta: " . $conexion->error . 
+        " (Código: " . $conexion->errno . ")");
+}
+
+echo "✅ Consulta exitosa<br>";
+?>
+```
+
+---
+
+#### **¿Por qué existen dos propiedades diferentes?**
+
+MySQLi necesita distinguir entre:
+
+1. **Errores de conexión**: El objeto `mysqli` se crea incluso si la conexión falla. Las propiedades `connect_*` almacenan el error inicial.
+
+2. **Errores de consulta**: Una vez conectado, las propiedades `error` / `errno` almacenan errores de las operaciones posteriores (query, prepare, etc.).
+
+**💡 Regla simple:**
+- **Antes de tener conexión** → usa `connect_error` / `connect_errno`
+- **Después de tener conexión** → usa `error` / `errno`
+
+---
+
+#### **Error común: Usar error en lugar de connect_error**
+
+```php
+<?php
+// ❌ INCORRECTO: error estará vacío si la conexión falla
+$conexion = new mysqli('db', 'root', 'wrong_password');
+
+if ($conexion->error) {  // ⚠️ Puede estar vacío
+    die("Error: " . $conexion->error);
+}
+
+// ✅ CORRECTO: connect_error siempre tiene el error de conexión
+$conexion = new mysqli('db', 'root', 'wrong_password');
+
+if ($conexion->connect_error) {
+    die("Error: " . $conexion->connect_error);
+}
+?>
+```
+
+---
+
+#### **Función completa con ambos tipos de errores**
+
+```php
+<?php
+/**
+ * Ejecuta una consulta SQL con manejo completo de errores.
+ * 
+ * @param mysqli $conexion Objeto de conexión MySQLi
+ * @param string $sql Consulta SQL a ejecutar
+ * @return mysqli_result|bool Resultado de la consulta
+ */
+function ejecutar_consulta_segura($conexion, $sql) {
+    // 1. Verificar que la conexión sea válida
+    if ($conexion->connect_errno) {
+        die("Error de conexión: " . $conexion->connect_error);
+    }
+    
+    // 2. Ejecutar consulta
+    $resultado = $conexion->query($sql);
+    
+    // 3. Verificar error de consulta
+    if ($resultado === false) {
+        die("Error en consulta: " . $conexion->error . "<br>SQL: $sql");
+    }
+    
+    return $resultado;
+}
+
+// Uso
+$conexion = new mysqli('db', 'root', 'test');
+$resultado = ejecutar_consulta_segura($conexion, "SELECT * FROM usuarios");
+?>
+```
+
+---
+
+#### **Tabla resumen de propiedades de error**
+
+| Propiedad | Tipo | Cuándo está disponible | Valor si no hay error |
+|-----------|------|------------------------|----------------------|
+| `connect_errno` | int | Siempre (después de `new mysqli()`) | `0` |
+| `connect_error` | string | Siempre (después de `new mysqli()`) | `null` |
+| `errno` | int | Solo después de consulta fallida | `0` |
+| `error` | string | Solo después de consulta fallida | `""` (cadena vacía) |
+
+---
+
 ## Ejecutar consultas SQL
 
 ### Método `query()`
