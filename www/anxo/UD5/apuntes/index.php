@@ -119,7 +119,7 @@
         </li>
     </ul>
 
-    <div class="tema">🔌 Interfaces </div>
+    <div class="tema">🔌 Interfaces y Traits </div>
 <ul>
     <li>
         <a href="12_interfaces.php">12. Interfaces</a>
@@ -132,6 +132,10 @@
     <li>
         <a href="14_multiples_interfaces.php">14. Múltiples Interfaces</a>
         <span class="descripcion">— Una clase puede implementar varias interfaces</span>
+    </li>
+    <li>
+        <a href="15_traits.php">15. Traits</a>
+        <span class="descripcion">— Reutilizar código en múltiples clases</span>
     </li>
 </ul>
 <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; color: #999; text-align: center;">
