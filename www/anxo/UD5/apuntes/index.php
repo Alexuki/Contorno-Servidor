@@ -138,6 +138,26 @@
         <span class="descripcion">— Reutilizar código en múltiples clases</span>
     </li>
 </ul>
+
+<div class="tema">🔧 Constantes, Estáticos y Avanzado</div>
+<ul>
+    <li>
+        <a href="16_constantes.php">16. Constantes de Clase</a>
+        <span class="descripcion">— const, self::, ::</span>
+    </li>
+    <li>
+        <a href="17_estaticos.php">17. Métodos y Propiedades Estáticas</a>
+        <span class="descripcion">— static, self::, sin instanciar</span>
+    </li>
+    <li>
+        <a href="18_stdclass.php">18. Objetos Vacíos (stdClass)</a>
+        <span class="descripcion">— Propiedades dinámicas, JSON</span>
+    </li>
+    <li>
+        <a href="19_excepciones.php">19. Errores y Excepciones</a>
+        <span class="descripcion">— throw, try-catch</span>
+    </li>
+</ul>
 <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; color: #999; text-align: center;">
         <p>UD - Desarrollo Web en Entorno Servidor</p>
     </footer>
