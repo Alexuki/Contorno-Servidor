@@ -2,11 +2,13 @@
 
 ## Índice
 1. [Enlaces `<a>` y métodos HTTP](#enlaces-a-y-métodos-http)
-2. [Navegación a la misma página con GET](#navegación-a-la-misma-página-con-get)
-3. [Operaciones destructivas con POST](#operaciones-destructivas-con-post)
-4. [Confirmaciones y seguridad](#confirmaciones-y-seguridad)
-5. [Ejemplos prácticos completos](#ejemplos-prácticos-completos)
-6. [Mejores prácticas](#mejores-prácticas)
+2. [Navegación con formularios `<form>`](#navegación-con-formularios-form)
+3. [Navegación a la misma página con GET](#navegación-a-la-misma-página-con-get)
+4. [Operaciones destructivas con POST](#operaciones-destructivas-con-post)
+5. [Confirmaciones y seguridad](#confirmaciones-y-seguridad)
+6. [Ejemplos prácticos completos](#ejemplos-prácticos-completos)
+7. [Mejores prácticas](#mejores-prácticas)
+8. [Caché del navegador y navegación hacia atrás (BFCache)](#caché-del-navegador-y-navegación-hacia-atrás-bfcache)
 
 ---
 
@@ -76,6 +78,143 @@ $id = $_GET['id'];           // 5
 $q = $_GET['q'];             // 'php'
 $categoria = $_GET['categoria']; // 'libros'
 ?>
+```
+
+---
+
+### Parámetros de tipo bandera (flag): `?clave=1`
+
+A veces no interesa pasar un **valor**, sino simplemente **señalar que debe ocurrir una acción**. En ese caso se usa un parámetro cuyo valor es irrelevante (normalmente `1`); lo único que importa es si está presente en la URL o no. PHP lo comprueba con `isset()`.
+
+```html
+<!-- El valor "1" es arbitrario; solo importa que el parámetro exista -->
+<a href="?destruir=1">Destruir sesión completa</a>
+```
+
+Cuando el usuario hace clic, la URL queda:
+```
+pagina.php?destruir=1
+```
+
+PHP detecta la presencia del parámetro con `isset()`:
+
+```php
+<?php
+session_start();
+
+if (isset($_GET['destruir'])) {
+    // El valor de $_GET['destruir'] no importa (podría ser '1', 'yes', 'true'…)
+    session_unset();   // Elimina todas las variables de sesión
+    session_destroy(); // Destruye el fichero de sesión en el servidor
+    header('Location: ' . $_SERVER['PHP_SELF']); // Redirige para limpiar la URL
+    exit();
+}
+?>
+```
+
+**Puntos clave:**
+- `?destruir=1` → parámetro `destruir` con valor `1` (el valor no se usa).
+- `isset($_GET['destruir'])` → devuelve `true` si el parámetro existe en la URL, independientemente de su valor.
+- Tras ejecutar la acción se hace un `header('Location: …')` + `exit()` para limpiar la URL (patrón PRG — Post/Redirect/Get adaptado a GET).
+- Si el usuario accede a la página sin el parámetro, el `if` simplemente no se ejecuta.
+
+**Comparativa con parámetro de valor:**
+
+| Tipo | Ejemplo | Qué se lee en PHP |
+|------|---------|-------------------|
+| Valor concreto | `?id=5` | `$_GET['id']` → `"5"` |
+| Bandera (flag) | `?destruir=1` | Solo `isset($_GET['destruir'])` |
+
+---
+
+## Navegación con formularios `<form>`
+
+### Método por defecto
+
+Si no se especifica el atributo `method`, el formulario usa **GET**:
+
+```html
+<!-- Equivalentes: los dos envían con GET -->
+<form action="buscar.php">
+    <input name="q"><button>Buscar</button>
+</form>
+
+<form method="GET" action="buscar.php">
+    <input name="q"><button>Buscar</button>
+</form>
+```
+
+---
+
+### ¿A dónde se envía si no hay `action`?
+
+Si se omite el atributo `action` (o se deja vacío `action=""`), el formulario se envía **a la misma página** que lo contiene, exactamente igual que si se hubiera escrito `action="<?= $_SERVER['PHP_SELF'] ?>"`. La URL actual (incluyendo cualquier query string existente) se usa como destino.
+
+```html
+<!-- Los tres son equivalentes: envían al archivo actual -->
+<form method="POST">
+    ...
+</form>
+
+<form method="POST" action="">
+    ...
+</form>
+
+<form method="POST" action="<?= $_SERVER['PHP_SELF'] ?>">
+    ...
+</form>
+```
+
+**En PHP** se procesa igual que cualquier otro envío:
+
+```php
+<?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // El formulario fue enviado
+    $nombre = $_POST['nombre'];
+}
+?>
+<!doctype html>
+<html>
+<body>
+    <form method="POST">  <!-- sin action: vuelve a esta misma página -->
+        <input type="text" name="nombre">
+        <button type="submit">Enviar</button>
+    </form>
+</body>
+</html>
+```
+
+---
+
+### Resumen de combinaciones
+
+| `method` | `action` | Resultado |
+|----------|----------|-----------|
+| Omitido (GET) | `buscar.php` | GET a `buscar.php` |
+| `GET` | Omitido / `""` | GET a la página actual |
+| `POST` | `guardar.php` | POST a `guardar.php` |
+| `POST` | Omitido / `""` | POST a la página actual |
+
+---
+
+### Diferencia práctica entre `<a>` y `<form>` para acciones
+
+```html
+<!-- Enlace: siempre GET, parámetros visibles en URL -->
+<a href="?destruir=1">Destruir sesión</a>
+
+<!-- Formulario GET: parámetros también en URL, pero se pueden pre-rellenar con inputs ocultos -->
+<form method="GET">
+    <input type="hidden" name="destruir" value="1">
+    <button>Destruir sesión</button>
+</form>
+
+<!-- Formulario POST: parámetros en el cuerpo, NO visibles en URL (recomendado para acciones destructivas) -->
+<form method="POST">
+    <input type="hidden" name="destruir" value="1">
+    <button>Destruir sesión</button>
+</form>
 ```
 
 ---
@@ -164,6 +303,27 @@ $registros = obtenerTodosLosRegistros();
 ```
 lista.php?eliminar=5
 ```
+
+---
+
+### ¿Es necesario `$_SERVER['PHP_SELF']`? ¿No basta con `?clave=valor`?
+
+No, no es necesario. Una URL que empieza por `?` es una **URL relativa sin ruta**: el navegador mantiene el archivo actual y solo sustituye la query string. Estas tres formas son equivalentes:
+
+```html
+<!-- Las tres navegan a la misma página -->
+<a href="?eliminar=5">Eliminar</a>
+<a href="<?= $_SERVER['PHP_SELF'] ?>?eliminar=5">Eliminar</a>
+<a href="lista.php?eliminar=5">Eliminar</a>
+```
+
+| Forma | Cuándo usarla |
+|-------|--------------|
+| `?eliminar=5` | ✅ Recomendado para enlaces a la misma página: corto y suficiente |
+| `$_SERVER['PHP_SELF']?eliminar=5` | Cuando se quiere ser explícito; habitual en `action` de formularios |
+| `lista.php?eliminar=5` | Solo si el destino es otro archivo o el nombre es fijo |
+
+> **Nota:** `$_SERVER['PHP_SELF']` se usa más en el atributo `action` de `<form>` porque ahí omitirlo también funciona, pero dejarlo explícito deja más clara la intención.
 
 ---
 
@@ -848,8 +1008,90 @@ if (isset($_GET['accion']) && $_GET['accion'] === 'eliminar') {
 
 ---
 
+## Caché del navegador y navegación hacia atrás (BFCache)
+
+### El problema
+
+Cuando navegas hacia atrás (o hacia adelante) con las flechas del navegador, **el script PHP no se ejecuta**. Las variables de sesión no se actualizan, los contadores no cambian, y la página que ves puede estar desactualizada.
+
+```
+ Usuario pulsa ← Atrás
+         │
+         ▼
+  Navegador consulta su BFCache
+         │
+   ¿Tiene la página guardada?  ──Sí──►  Muestra la copia en memoria
+         │                               (PHP nunca se ejecuta)
+         No
+         │
+         ▼
+  Petición HTTP al servidor  ──────────►  PHP ejecuta el script
+```
+
+### Qué es el BFCache
+
+El **Back-Forward Cache** (BFCache) es una optimización de los navegadores modernos (Chrome, Firefox, Safari) que guarda una snapshot completa de la página en memoria RAM cuando el usuario navega fuera de ella. Al volver, restaura esa snapshot al instante — sin hacer ninguna petición HTTP.
+
+Esto es intencionado: hace la navegación mucho más rápida. El problema es que en aplicaciones PHP donde cada carga tiene efectos (incrementar un contador, registrar una visita, comprobar sesión…), el servidor nunca se entera de que el usuario volvió.
+
+### Ejemplo concreto
+
+```php
+<?php
+session_start();
+// Este código NO se ejecuta al volver con ← Atrás
+$_SESSION["count"] = isset($_SESSION["count"]) ? $_SESSION["count"] + 1 : 0;
+?>
+<p>Visitas: <?= $_SESSION["count"] ?></p>
+<a href="otra.php">Ir a otra página</a>
+```
+
+Flujo:
+```
+1. Usuario carga la página                 → count = 0
+2. Usuario hace clic en "Ir a otra página" → PHP ejecuta, count = 1
+3. Usuario pulsa ← Atrás                  → BFCache: muestra "count = 0"
+                                             PHP NO ejecuta, count sigue en 1 en sesión
+4. Usuario recarga (F5)                    → PHP ejecuta, count = 2
+```
+
+### Cómo forzar que el servidor responda siempre (deshabilitar caché)
+
+Se puede indicar al navegador que no guarde la página en caché mediante cabeceras HTTP. Hay que enviarlas **antes de cualquier salida**:
+
+```php
+<?php
+// Deshabilitar toda caché para esta página
+header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
+session_start();
+$_SESSION["count"] = isset($_SESSION["count"]) ? $_SESSION["count"] + 1 : 0;
+?>
+```
+
+Con estas cabeceras, el navegador ignora el BFCache para esta página y siempre hace una petición nueva al servidor.
+
+### Cuándo deshabilitarlo y cuándo no
+
+| Situación | ¿Deshabilitar caché? | Motivo |
+|-----------|---------------------|--------|
+| Contador de visitas / sesión activa | ✅ Sí | El estado cambia en cada carga |
+| Panel de admin / datos en tiempo real | ✅ Sí | Los datos deben estar actualizados |
+| Página de logout | ✅ Sí | Volver atrás no debe restaurar la sesión |
+| Página estática o de contenido fijo | ❌ No | La caché mejora el rendimiento |
+| Formulario ya enviado (POST) | — | El navegador ya pregunta antes de reenviar |
+
+### Nota sobre POST y navegación hacia atrás
+
+Con formularios `POST` el comportamiento es distinto: el navegador **sí avisa** antes de reenviar los datos (muestra un diálogo *"¿Deseas volver a enviar el formulario?"*). Esto no ocurre con GET porque GET se considera una operación de solo lectura y el navegador la cachea libremente.
+
+---
+
 ## Referencias
 
 - [Métodos HTTP](https://developer.mozilla.org/es/docs/Web/HTTP/Methods)
 - [Formularios HTML](https://developer.mozilla.org/es/docs/Learn/Forms)
 - [CSRF Protection](https://owasp.org/www-community/attacks/csrf)
+- [Back-Forward Cache (BFCache) - web.dev](https://web.dev/bfcache/)

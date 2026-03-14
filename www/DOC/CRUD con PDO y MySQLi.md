@@ -3,14 +3,15 @@
 ## Índice
 1. [Conexión a la base de datos](#conexión-a-la-base-de-datos)
 2. [Diferencia entre query() y exec()](#diferencia-entre-query-y-exec)
-3. [Crear base de datos - die() vs devolver error](#crear-base-de-datos---die-vs-devolver-error)
-4. [CREATE - Insertar registros](#create---insertar-registros)
-5. [READ - Leer registros](#read---leer-registros)
-6. [UPDATE - Actualizar registros](#update---actualizar-registros)
-7. [DELETE - Eliminar registros](#delete---eliminar-registros)
-8. [Manejo de errores](#manejo-de-errores)
-9. [Mejores prácticas](#mejores-prácticas)
-10. [Comparación PDO vs MySQLi](#comparación-pdo-vs-mysqli)
+3. [Consultas preparadas en PDO](#consultas-preparadas-en-pdo)
+4. [Crear base de datos - die() vs devolver error](#crear-base-de-datos---die-vs-devolver-error)
+5. [CREATE - Insertar registros](#create---insertar-registros)
+6. [READ - Leer registros](#read---leer-registros)
+7. [UPDATE - Actualizar registros](#update---actualizar-registros)
+8. [DELETE - Eliminar registros](#delete---eliminar-registros)
+9. [Manejo de errores](#manejo-de-errores)
+10. [Mejores prácticas](#mejores-prácticas)
+11. [Comparación PDO vs MySQLi](#comparación-pdo-vs-mysqli)
 
 ---
 
@@ -179,6 +180,473 @@ $mysqli->query("DELETE FROM usuarios WHERE id = 5");
 echo $mysqli->affected_rows;
 ?>
 ```
+
+---
+
+## Consultas preparadas en PDO
+
+Cuando ves este flujo:
+
+1. `prepare()`
+2. enlazar parámetros (`bindParam()` o `bindValue()`)
+3. `execute()`
+
+estás usando una consulta preparada "clásica". También puedes pasar los valores directamente en `execute([...])`.
+
+### Forma A: `bindParam()` + `execute()`
+
+```php
+<?php
+$sql = "SELECT * FROM usuarios WHERE nombre = :nombre AND edad >= :edad";
+$stmt = $pdo->prepare($sql);
+
+$nombre = 'Ana';
+$edadMinima = 18;
+
+$stmt->bindParam(':nombre', $nombre, PDO::PARAM_STR);
+$stmt->bindParam(':edad', $edadMinima, PDO::PARAM_INT);
+
+$stmt->execute();
+$datos = $stmt->fetchAll();
+?>
+```
+
+`bindParam()` enlaza por referencia: si cambias la variable antes de `execute()`, se usa el nuevo valor.
+
+### Forma B: `execute()` con array asociativo
+
+```php
+<?php
+$sql = "SELECT * FROM usuarios WHERE nombre = :nombre AND edad >= :edad";
+$stmt = $pdo->prepare($sql);
+
+$stmt->execute([
+        ':nombre' => 'Ana',
+        ':edad' => 18
+]);
+
+$datos = $stmt->fetchAll();
+?>
+```
+
+Es la forma mas compacta y suele ser la mas usada cuando ejecutas una sola vez o no necesitas reutilizar variables enlazadas.
+
+### Forma C: `bindValue()` + `execute()`
+
+```php
+<?php
+$sql = "SELECT * FROM usuarios WHERE nombre = :nombre";
+$stmt = $pdo->prepare($sql);
+
+$stmt->bindValue(':nombre', 'Ana', PDO::PARAM_STR);
+$stmt->execute();
+?>
+```
+
+`bindValue()` enlaza el valor inmediatamente (no por referencia).
+
+### Entonces, ¿el resultado es el mismo?
+
+Para la mayoria de casos, si: el SQL final ejecutado y el resultado en base de datos son equivalentes si envias los mismos valores.
+
+Diferencias clave:
+
+- `bindParam()`:
+    - Enlaza variables por referencia.
+    - Util para ejecutar varias veces cambiando variables entre ejecuciones.
+    - Requiere variables (no puedes pasar un literal directamente).
+- `bindValue()`:
+    - Enlaza un valor concreto en ese momento.
+    - Mas claro cuando no necesitas referencia.
+- `execute([...])`:
+    - Muy legible y rapido de escribir.
+    - Ideal para la mayoria de operaciones CRUD simples.
+    - Evita lineas extra de `bind...`.
+
+### Ejemplo donde `bindParam()` marca diferencia
+
+```php
+<?php
+$stmt = $pdo->prepare("INSERT INTO logs (usuario, accion) VALUES (:usuario, :accion)");
+
+$stmt->bindParam(':usuario', $usuario, PDO::PARAM_STR);
+$stmt->bindParam(':accion', $accion, PDO::PARAM_STR);
+
+$usuario = 'ana';
+$accion = 'login';
+$stmt->execute();
+
+$accion = 'logout';
+$stmt->execute();
+// Se reutiliza el mismo statement cambiando solo variables
+?>
+```
+
+### Recomendacion practica
+
+- Usa `execute([...])` en la mayoria de consultas.
+- Usa `bindValue()` si quieres indicar tipo de forma explicita y mantener claridad.
+- Usa `bindParam()` cuando vayas a reutilizar el mismo `PDOStatement` varias veces con variables que cambian.
+
+En los tres enfoques sigues teniendo la misma ventaja principal: evitar inyeccion SQL al separar consulta y datos.
+
+### Placeholders posicionales (`?`) vs nombrados (`:campo`)
+
+Ambos estilos son correctos en PDO:
+
+- Posicional:
+
+```php
+<?php
+$sql = "SELECT * FROM usuarios WHERE pais = ? AND edad >= ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute(['Espana', 18]); // array normal indexado
+?>
+```
+
+- Nombrado:
+
+```php
+<?php
+$sql = "SELECT * FROM usuarios WHERE pais = :pais AND edad >= :edad";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([
+    ':pais' => 'Espana',
+    ':edad' => 18
+]); // array asociativo
+?>
+```
+
+Regla importante: no mezcles `?` y `:nombre` en la misma sentencia.
+
+### Que recibe exactamente `execute()`
+
+- Si el SQL tiene `?`: `execute()` recibe array indexado, y el orden importa.
+- Si el SQL tiene `:nombre`: `execute()` recibe array asociativo por nombre de placeholder.
+- Si no hay parametros: `execute([])` o `execute()`.
+
+### Caso real del proyecto (`findAll` en Villa Olimpica)
+
+En `findAll`, el SQL se construye dinamicamente y usa `?`:
+
+```php
+<?php
+if (!empty($filtros['tipo'])) {
+    $sql .= " AND d.tipo_deporte = ?";
+    $params[] = $filtros['tipo'];
+}
+if (!empty($filtros['pais'])) {
+    $sql .= " AND d.pais = ?";
+    $params[] = $filtros['pais'];
+}
+if (!empty($filtros['min_medallas'])) {
+    $sql .= " AND (d.medallas_oro + d.medallas_plata + d.medallas_bronce) >= ?";
+    $params[] = $filtros['min_medallas'];
+}
+
+$stmt = $this->conn->prepare($sql);
+$stmt->execute($params);
+?>
+```
+
+Aqui `$params` es un array normal (`['esqui', 'Austria', 3]` por ejemplo), y PDO enlaza cada valor con su `?` correspondiente por posicion.
+
+Nota practica: con `!empty(...)`, el valor `0` se considera vacio y ese filtro no se anade.
+
+---
+
+## Resumen de examen: consultas preparadas (PDO y MySQLi)
+
+Este bloque es una chuleta rapida para estudiar.
+
+### 1) Flujo mental comun (siempre igual)
+
+1. Escribir SQL con placeholders.
+2. `prepare(...)`.
+3. Enlazar o pasar parametros.
+4. `execute(...)`.
+5. Recuperar datos (si es SELECT) o filas afectadas (si es INSERT/UPDATE/DELETE).
+
+### 2) PDO: como se hace
+
+#### A) SELECT con placeholders posicionales `?`
+
+```php
+<?php
+$sql = "SELECT id, nombre, pais FROM usuarios WHERE pais = ? AND edad >= ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute(['Espana', 18]); // array indexado
+
+$fila = $stmt->fetch();          // una fila
+$todas = $stmt->fetchAll();      // todas las filas
+?>
+```
+
+#### B) SELECT con placeholders nombrados `:nombre`
+
+```php
+<?php
+$sql = "SELECT id, nombre FROM usuarios WHERE pais = :pais AND edad >= :edad";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([
+        ':pais' => 'Espana',
+        ':edad' => 18
+]); // array asociativo
+
+$datos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+```
+
+#### C) INSERT/UPDATE/DELETE
+
+```php
+<?php
+$stmt = $pdo->prepare("INSERT INTO usuarios (nombre, pais) VALUES (?, ?)");
+$stmt->execute(['Ana', 'Espana']);
+
+$nuevoId = $pdo->lastInsertId(); // para INSERT
+$afectadas = $stmt->rowCount();  // filas afectadas
+?>
+```
+
+Reglas PDO para examen:
+
+- Si usas `?` -> `execute([...])` con array indexado en orden.
+- Si usas `:campo` -> `execute([...])` con array asociativo.
+- No mezclar `?` y `:campo` en la misma sentencia.
+
+### 3) MySQLi (orientado a objetos): como se hace
+
+MySQLi usa `?` y tipos en `bind_param`.
+
+#### A) SELECT
+
+```php
+<?php
+$stmt = $mysqli->prepare("SELECT id, nombre, pais FROM usuarios WHERE pais = ? AND edad >= ?");
+
+$pais = 'Espana';
+$edad = 18;
+$stmt->bind_param('si', $pais, $edad); // s=string, i=int
+$stmt->execute();
+
+$result = $stmt->get_result();
+$fila = $result->fetch_assoc();
+$todas = $result->fetch_all(MYSQLI_ASSOC);
+
+$stmt->close();
+?>
+```
+
+#### B) INSERT/UPDATE/DELETE
+
+```php
+<?php
+$stmt = $mysqli->prepare("UPDATE usuarios SET pais = ? WHERE id = ?");
+
+$pais = 'Portugal';
+$id = 7;
+$stmt->bind_param('si', $pais, $id);
+$stmt->execute();
+
+$afectadas = $stmt->affected_rows;
+$stmt->close();
+?>
+```
+
+Tipos en `bind_param` (muy preguntable):
+
+- `s` string
+- `i` integer
+- `d` double
+- `b` blob
+
+### 4) Diferencia clave PDO vs MySQLi en parametros
+
+- PDO: puedes usar `?` o `:nombre`; normalmente pasas todo en `execute(...)`.
+- MySQLi: placeholders `?` + `bind_param('tipos', ...)` obligatorio para valores.
+
+### 5) Como recuperar datos en cada uno
+
+- PDO:
+    - `fetch()` una fila
+    - `fetchAll()` todas
+    - modo recomendado en examen: `PDO::FETCH_ASSOC`
+- MySQLi:
+    - `get_result()->fetch_assoc()` una fila
+    - `get_result()->fetch_all(MYSQLI_ASSOC)` todas
+
+### 5.1) Como consultar los datos despues de `fetch`
+
+#### PDO (`FETCH_ASSOC`)
+
+```php
+<?php
+$stmt = $pdo->prepare("SELECT id, nombre, pais FROM usuarios WHERE id = ?");
+$stmt->execute([7]);
+
+$fila = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($fila) {
+    echo $fila['id'];
+    echo $fila['nombre'];
+    echo $fila['pais'];
+}
+?>
+```
+
+Con varias filas:
+
+```php
+<?php
+$stmt = $pdo->query("SELECT id, nombre FROM usuarios");
+$filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($filas as $f) {
+    echo $f['id'] . ' - ' . $f['nombre'] . "<br>";
+}
+?>
+```
+
+#### MySQLi (`fetch_assoc`)
+
+```php
+<?php
+$stmt = $mysqli->prepare("SELECT id, nombre, pais FROM usuarios WHERE id = ?");
+$id = 7;
+$stmt->bind_param('i', $id);
+$stmt->execute();
+
+$result = $stmt->get_result();
+$fila = $result->fetch_assoc();
+
+if ($fila) {
+    echo $fila['id'];
+    echo $fila['nombre'];
+    echo $fila['pais'];
+}
+?>
+```
+
+Con varias filas:
+
+```php
+<?php
+$stmt = $mysqli->prepare("SELECT id, nombre FROM usuarios");
+$stmt->execute();
+$result = $stmt->get_result();
+
+while ($fila = $result->fetch_assoc()) {
+    echo $fila['id'] . ' - ' . $fila['nombre'] . "<br>";
+}
+?>
+```
+
+Idea clave: en ambos casos, cuando usas modo asociativo, consultas cada campo por nombre de columna (`$fila['nombre']`, `$fila['pais']`, etc.).
+
+### 6) Errores tipicos de examen
+
+- Concatenar variables en SQL (inyeccion SQL).
+- Orden incorrecto de parametros con `?`.
+- Poner mal la cadena de tipos en `bind_param`.
+- Mezclar placeholders posicionales y nombrados en PDO.
+- Olvidar `execute()` antes de `fetch`.
+
+### Por que evita inyeccion SQL
+
+La inyeccion SQL ocurre cuando concatenas texto del usuario dentro del SQL y ese texto se interpreta como parte del comando.
+
+Ejemplo vulnerable (NO hacer):
+
+```php
+<?php
+$usuario = $_POST['usuario'];
+$sql = "SELECT * FROM usuarios WHERE nombre = '$usuario'";
+$stmt = $pdo->query($sql);
+?>
+```
+
+Si alguien envia algo como `ana' OR '1'='1`, la consulta puede convertirse en una condicion siempre verdadera.
+
+Asi quedaria la consulta final en cada caso:
+
+#### Caso 1: SQL directo (vulnerable)
+
+Input del usuario:
+
+```text
+ana' OR '1'='1
+```
+
+Consulta resultante:
+
+```sql
+SELECT * FROM usuarios WHERE nombre = 'ana' OR '1'='1'
+```
+
+Aqui el `OR '1'='1'` se interpreta como parte del SQL, por eso puede devolver muchas filas (o todas).
+
+#### Caso 2: Consulta preparada (segura)
+
+Plantilla SQL (fija):
+
+```sql
+SELECT * FROM usuarios WHERE nombre = :usuario
+```
+
+Parametro enviado:
+
+```text
+:usuario = "ana' OR '1'='1"
+```
+
+SQL resultante final (conceptual) tras ejecutar con ese dato:
+
+```sql
+SELECT * FROM usuarios WHERE nombre = 'ana'' OR ''1''=''1'
+```
+
+Observa que las comillas internas del dato quedan escapadas dentro del valor de texto, por lo que no "rompen" la consulta.
+
+En la ejecucion real, el motor mantiene separadas plantilla y datos. Es decir, no concatena texto SQL; internamente funciona como:
+
+```sql
+SELECT * FROM usuarios WHERE nombre = ?
+```
+
+con este valor de parametro:
+
+```text
+["ana' OR '1'='1"]
+```
+
+El contenido del parametro se compara como texto literal del campo `nombre`; no se ejecuta como `OR` SQL.
+
+Con consulta preparada, el SQL y los datos viajan separados:
+
+```php
+<?php
+$sql = "SELECT * FROM usuarios WHERE nombre = :usuario";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([':usuario' => $_POST['usuario']]);
+?>
+```
+
+Aqui, lo que envia el usuario se trata como dato literal (valor del parametro), no como codigo SQL ejecutable.
+
+### Ventajas frente a SQL directo (concatenado)
+
+- Seguridad: reduce de forma drastica el riesgo de inyeccion SQL.
+- Robustez: evita errores por comillas, caracteres especiales y escaping manual.
+- Legibilidad: separa claramente la estructura de la consulta de los datos.
+- Reutilizacion: puedes preparar una vez y ejecutar varias veces con valores distintos.
+- Mantenimiento: codigo mas facil de revisar y auditar.
+
+### Idea clave para recordar
+
+- SQL directo con concatenacion: "mezcla instruccion + datos".
+- Consulta preparada: "instruccion fija + datos enlazados".
+
+Por eso, en cualquier consulta con datos variables (sobre todo datos de formularios), la opcion recomendada es `prepare()` + `execute()`.
 
 ---
 
@@ -713,6 +1181,84 @@ if ($resultado['exito']) {
 ```
 
 ---
+
+### Caso real: alta de producto con imagen (BLOB)
+
+Este es el caso del ejercicio `dar_alta_producto` de `base_datos.php`, documentado en PDO y MySQLi para compararlos de forma directa.
+
+#### PDO (equivalente funcional)
+
+```php
+<?php
+function darAltaProductoPDO($pdo, $nombre, $descripcion, $precio, $unidades, $fotoBinaria)
+{
+    $sql = "INSERT INTO productos (nombre, descripcion, precio, unidades, foto)
+            VALUES (:nombre, :descripcion, :precio, :unidades, :foto)";
+
+    $stmt = $pdo->prepare($sql);
+
+    $stmt->bindValue(':nombre', $nombre, PDO::PARAM_STR);
+    $stmt->bindValue(':descripcion', $descripcion, PDO::PARAM_STR);
+    $stmt->bindValue(':precio', $precio); // decimal/double segun driver
+    $stmt->bindValue(':unidades', $unidades, PDO::PARAM_INT);
+    $stmt->bindValue(':foto', $fotoBinaria, PDO::PARAM_LOB);
+
+    return $stmt->execute();
+}
+?>
+```
+
+En PDO no existe `send_long_data()`. El binario se pasa en el propio `bindValue`/`execute`, normalmente con `PDO::PARAM_LOB`.
+
+#### MySQLi (caso del ejercicio)
+
+```php
+<?php
+function dar_alta_producto($conexion, $nombre, $descripcion, $precio, $unidades, $foto_binaria)
+{
+    $sql = $conexion->prepare(
+        "INSERT INTO productos (nombre, descripcion, precio, unidades, foto) VALUES (?,?,?,?,?)"
+    );
+
+    // s=string, s=string, d=double, i=integer, b=blob
+    $foto_placeholder = null;
+    $sql->bind_param("ssdib", $nombre, $descripcion, $precio, $unidades, $foto_placeholder);
+
+    // El indice 4 corresponde al 5o parametro (?) de la consulta, empezando en 0.
+    $sql->send_long_data(4, $foto_binaria);
+
+    return $sql->execute();
+}
+?>
+```
+
+#### Explicacion del metodo `dar_alta_producto` (MySQLi)
+
+1. Prepara una sentencia `INSERT` con 5 placeholders (`?`).
+2. Enlaza tipos con `bind_param("ssdib", ...)`:
+   - `nombre` y `descripcion` como `string`.
+   - `precio` como `double`.
+   - `unidades` como `integer`.
+   - `foto` como `blob` (`b`).
+3. Envia el binario de `foto` con `send_long_data(4, $foto_binaria)`.
+4. Ejecuta con `execute()`.
+
+#### Por que en MySQLi el BLOB va en segunda llamada
+
+Con MySQLi, el marcador `b` indica que el parametro es binario/largo y el contenido se suministra con `send_long_data()`.
+
+- `bind_param()` fija tipos y referencia de variables.
+- `send_long_data()` asocia los bytes reales al placeholder BLOB.
+- Despues `execute()` envia y ejecuta la consulta completa.
+
+Esta separacion permite enviar datos grandes de forma mas robusta, incluso en varios fragmentos si fuera necesario.
+
+#### Diferencia clave PDO vs MySQLi para BLOB
+
+- PDO: el BLOB se enlaza y se ejecuta en el flujo normal (`bindValue`/`execute`), sin `send_long_data()`.
+- MySQLi: para el tipo `b`, se usa `send_long_data()` antes de `execute()`.
+
+
 
 ## READ - Leer registros
 

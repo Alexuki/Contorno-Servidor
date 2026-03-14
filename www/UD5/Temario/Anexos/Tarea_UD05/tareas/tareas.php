@@ -1,0 +1,95 @@
+<?php
+require_once('../auth.php');
+requireLogin();
+$tema = getTema();
+?>
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="<?php echo $tema; ?>">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tareas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <?php include_once('../vista/header.php'); ?>
+
+    <div class="container-fluid">
+        <div class="row">
+            <?php include_once('../vista/menu.php'); ?>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="container justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h2>Tareas</h2>
+                </div>
+
+                <div class="container justify-content-between">
+                <?php
+                    require_once('../modelo/pdo.php');
+
+                    $estado = isset($_GET['estado']) ? $_GET['estado'] : null;
+                    $idUsuarioFiltro = isset($_GET['id_usuario']) ? (int) $_GET['id_usuario'] : null;
+                    $usuarioSesion = getUsuarioSesion();
+
+                    if (!esAdmin()) {
+                        $idUsuarioFiltro = $usuarioSesion->getId();
+                    }
+
+                    $resultado = listaTareasPDO($idUsuarioFiltro, $estado);
+
+                    if ($resultado && $resultado[0]) {
+                ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Titulo</th>
+                                    <th>Descripcion</th>
+                                    <th>Estado</th>
+                                    <th>Usuario</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                    $lista = $resultado[1];
+                                    if (count($lista) > 0) {
+                                        foreach ($lista as $tarea) {
+                                            echo '<tr>';
+                                            echo '<td>' . $tarea->getId() . '</td>';
+                                            echo '<td>' . htmlspecialchars($tarea->getTitulo()) . '</td>';
+                                            echo '<td>' . htmlspecialchars($tarea->getDescripcion()) . '</td>';
+                                            echo '<td>' . htmlspecialchars($tarea->getEstado()) . '</td>';
+                                            echo '<td>' . $tarea->getUsuario() . '</td>';
+                                            echo '<td>';
+                                            echo '<a class="btn btn-sm btn-outline-primary" href="tarea.php?id=' . $tarea->getId() . '" role="button">Ver</a>';
+                                            echo '<a class="btn btn-sm btn-outline-success ms-2" href="editaTareaForm.php?id=' . $tarea->getId() . '" role="button">Editar</a>';
+                                            if (esAdmin()) {
+                                                echo '<a class="btn btn-sm btn-outline-danger ms-2" href="borraTarea.php?id=' . $tarea->getId() . '" role="button">Borrar</a>';
+                                            }
+                                            echo '</td>';
+                                            echo '</tr>';
+                                        }
+                                    } else {
+                                        echo '<tr><td colspan="100">No hay tareas</td></tr>';
+                                    }
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php
+                    } else {
+                        echo '<div class="alert alert-warning" role="alert">' . $resultado[1] . '</div>';
+                    }
+                ?>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <?php include_once('../vista/footer.php'); ?>
+
+</body>
+</html>
