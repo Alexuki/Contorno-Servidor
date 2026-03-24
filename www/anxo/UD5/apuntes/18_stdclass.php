@@ -32,16 +32,5 @@ $producto = (object)$datos;
 echo "<h2>Array convertido a objeto</h2>";
 echo "Producto: " . $producto->producto . "<br>";
 echo "Precio: " . $producto->precio . "€<br>";
-
-// Crear objeto vacío para respuesta API
-$respuesta = new stdClass();
-$respuesta->exito = true;
-$respuesta->mensaje = "Operación completada";
-$respuesta->datos = $obj;
-
-echo "<h2>Objeto anidado para API</h2>";
-echo "<pre>";
-print_r($respuesta);
-echo "</pre>";
 ?>
 <p style="margin-top: 2rem;"><a href="index.php">← Volver al menú</a></p>
